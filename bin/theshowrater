@@ -1,0 +1,86 @@
+#!/usr/bin/env python2.7
+"""theShowRater command-line utility"""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+#from __future__ import unicode_literals
+from argparse import ArgumentParser
+import sys
+from theshowutil.playerdata import PlayerData, NoPlayerFoundError
+from theshowutil import view
+
+
+def normalize_yweight(yweight):
+    nyr = len(yweight)
+    wtot = sum(yweight.values())
+    for y in yweight:
+        yweight[y] = nyr * yweight[y] / wtot
+    return yweight
+
+
+def main(pids, currentyear, csv=False, noheader=False, stats=False,
+         yweight=None):
+
+    csvheadershown = False or noheader
+
+    for idx, pid in enumerate(pids):
+        try:
+            pd = PlayerData(pid, currentyear=currentyear, yweight=yweight)
+        except NoPlayerFoundError:
+            print("playerID '{:s}' not found; skipping..."
+                  .format(pid))
+            continue
+
+        if csv:
+            if not csvheadershown:
+                print(pd.attr.csvheader)
+                csvheadershown = True
+            print(pd.attr.csv)
+            continue
+        
+        maxcharwidth = 95
+        print()
+        print('=' * maxcharwidth)
+        fmt = '{:^' + str(maxcharwidth) + '}'
+        print(fmt.format("MLB THE SHOW PLAYER ATTRIBUTE RATINGS"))
+        print('=' * maxcharwidth)
+        view.showratings(pd.attr)
+        if stats:
+            print()
+            view.showstats(pd)
+        print()
+
+
+if __name__ == '__main__':
+    p = ArgumentParser(description=__doc__.strip())
+    p.add_argument('pids', metavar='playerID', type=str, nargs='*',
+                   help='Lahman playerID')
+    p.add_argument('-y', '--year', metavar='currentYear',
+                   nargs=1, type=int, default=2012,
+                   help='current year for the rating')
+    p.add_argument('-w', '--weight', metavar=('year', 'weight'), nargs=2,
+                   action='append', default=None,
+                   help='year and weight to be given for rating')
+    p.add_argument('--csv', action='store_true', default=False,
+                   help='generate csv output')
+    p.add_argument('--noheader', action='store_true', default=False,
+                   help='do not include csv header')
+    p.add_argument('--stats', action='store_true', default=False,
+                   help='show player statistics')
+    
+    args = p.parse_args()
+
+    pids = (args.pids if len(args.pids) else sys.stdin.read().split())
+    if len(pids) == 0:
+        p.error("no playerID provided")
+
+    currentyear = args.year[0]
+
+    # yweight is expected to be a dict throughout
+    yweight = (dict((int(k), float(v)) for (k, v) in args.weight)
+               if args.weight is not None and len(args.weight) > 0
+               else {currentyear: 2., (currentyear-1): 1., (currentyear-2): 1.})
+    normalize_yweight(yweight)
+
+    main(pids, currentyear=currentyear, yweight=yweight,
+         csv=args.csv, noheader=args.noheader, stats=args.stats)

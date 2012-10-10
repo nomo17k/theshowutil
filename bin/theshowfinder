@@ -1,0 +1,85 @@
+#!/usr/bin/env python2.7
+"""Search utility for teams and players
+
+Find a team by year and get playerIDs of all the players on the team.
+"""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+#from __future__ import unicode_literals
+from argparse import ArgumentParser
+from theshowutil.driver import find_teams_in_year, find_players_in_team
+from theshowutil import lahmandb
+from MySQLdb.cursors import DictCursor
+
+
+def find_players(year, team):
+    pids = find_players_in_team(year, team.upper())
+    if len(pids):
+        print(' '.join([o for o in pids]))
+
+
+def do_find_teams_in_year(year):
+    teams = find_teams_in_year(year)
+    for o in teams:
+        print("{:s} {:s} {:s}".format(*o))
+
+
+def search(searchstr, maxplayer=20, simple=False, db=lahmandb):
+    """Search players and get their playerIDs."""
+    c = db.cursor(DictCursor)
+    sql = """
+    SELECT playerID, CONCAT(nameFirst, ' ', nameLast) AS fullName,
+      birthYear, debut, finalGame
+      FROM Master
+      WHERE CONCAT(nameFirst, ' ', nameLast) LIKE %(key)s AND playerID != ''
+    """
+    c.execute(sql, {'key': '%{:s}%'.format(searchstr.lower())})
+    results = c.fetchmany(maxplayer + 1)
+
+    if simple:
+        pids = [x['playerID'] for x in results]
+        print(' '.join(pids))
+        return
+
+    if len(results) == 0:
+        print('No players found.')
+        return
+    elif len(results) > maxplayer:
+        print('More than {m} players found; listing first {m} players only.'
+              .format(m=maxplayer))
+        print('')
+
+    fmt = '{playerID:<9}  {fullName:<20}  {birthYear:<10}    {yearsActive:<20}'
+    header = fmt.format(playerID='Player ID', fullName='Full Name',
+                        birthYear='Born', yearsActive='Years Active')
+    print(header)
+    print('-' * len(header))
+    for p in results:
+        ya = '{0} - {1}'.format(p['debut'].year if p['debut'] else '',
+                                p['finalGame'].year if p['finalGame'] else '')
+        p['yearsActive'] = ya
+        print(fmt.format(**p))
+
+
+if __name__ == '__main__':
+    p = ArgumentParser(description=__doc__.strip())
+
+    g = p.add_mutually_exclusive_group(required=True)
+    g.add_argument('-p', '--player', type=str, nargs=1,
+                   help='search players')
+    g.add_argument('-t', '--team', metavar=("yearID", "teamID"),
+                   type=str, nargs='+',
+                   help='year and teamID')
+    
+    args = p.parse_args()
+
+    if args.player is not None:
+        search(args.player[0])
+    elif args.team:
+        year = int(args.team[0])
+        if len(args.team) > 1:
+            for t in args.team[1:]:
+                find_players(year, t)
+        else:
+            do_find_teams_in_year(year)
