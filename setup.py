@@ -5,7 +5,7 @@ MLB the Show Player Rating Utility
 from distutils.core import setup
 
 
-__version__ = '2012109'
+__version__ = '0.1.0'
 __author__ = 'Taro Sato'
 __author_email__ = 'okomestudio@gmail.com'
 
