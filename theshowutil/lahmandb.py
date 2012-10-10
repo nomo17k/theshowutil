@@ -17,7 +17,7 @@ import numpy as np
 
 
 DATABASE = 'lahman591'
-DEFAULT_FILE = '/'.join([os.environ["HOME"], ".my.cnf"])
+DEFAULT_FILE = '/'.join([os.environ.get('HOME', '~'), ".my.cnf"])
 
 
 _db = None
